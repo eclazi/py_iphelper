@@ -70,7 +70,7 @@ def _make_includes(includes):
 win32_cdef = '\n'.join([win32_defines, win32_structs, win32_functions])
 
 ffi = FFI()
-C = ffi.cdef(win32_cdef)
+ffi.cdef(win32_cdef)
 
 win32_include_files = [
     'winsock2.h',
