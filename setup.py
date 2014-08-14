@@ -1,5 +1,7 @@
 from distutils.core import setup
+
 import py_iphelper.adapter_info
+
 
 setup(
     name = 'py_iphelper',

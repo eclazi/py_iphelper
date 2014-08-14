@@ -1,2 +1,2 @@
-from adapter_info import GetAdaptersInfo
+from adapter_info import *
 
