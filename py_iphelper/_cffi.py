@@ -1,34 +1,30 @@
 from cffi import FFI
+from win32_constants import all_constants
 
-# We have to do all this because time_t isn't defined...??
-ffi1 = FFI()
-ffi1.cdef("""#define SIZE_OF_TIME_T ...""")
-lib = ffi1.verify("""
-   #include <sys/types.h>
-   #define SIZE_OF_TIME_T  sizeof(time_t)
-""")
+def get_time_t_type():
+    # We need to figure out the typedef of time_t for the current platform
+    ffi_time_t = FFI()
+    ffi_time_t.cdef('''#define SIZE_OF_TIME_T ...''')
+    time_t_lib = ffi_time_t.verify('''
+       #include <sys/types.h>
+       #define SIZE_OF_TIME_T  sizeof(time_t)
+    ''')
+    if time_t_lib.SIZE_OF_TIME_T == 4:
+        return 'int32_t'
+    elif time_t_lib.SIZE_OF_TIME_T == 8:
+        return 'int64_t'
+    else:
+        raise ValueError('time_t different size than expected')
 
-time_t_type = ''
-if lib.SIZE_OF_TIME_T == 4:
-    time_t_type = 'int32_t'
-elif lib.SIZE_OF_TIME_T == 8:
-    time_t_type = 'int64_t'
-else:
-    raise ValueError('time_t differnt size than expected')
+_time_t_type = get_time_t_type()
 
-win32_errors = """
+def _make_defines():
+    return '\n'.join(['#define %s ...' % constant for constant in all_constants])
 
-#define ERROR_BUFFER_OVERFLOW ...
-#define ERROR_INVALID_DATA ...
-#define ERROR_INVALID_PARAMETER ...
-#define ERROR_NO_DATA ...
-#define ERROR_NOT_SUPPORTED ...
-#define NO_ERROR ...
+win32_defines = _make_defines()
 
-"""
-
-structs = """
-
+win32_structs = \
+'''
 typedef struct {
   char String[16];
 } IP_ADDRESS_STRING, *PIP_ADDRESS_STRING, IP_MASK_STRING, *PIP_MASK_STRING;
@@ -60,23 +56,31 @@ typedef struct _IP_ADAPTER_INFO {
   %(time_t)s              LeaseObtained;
   %(time_t)s              LeaseExpires;
 } IP_ADAPTER_INFO, *PIP_ADAPTER_INFO;
+''' \
+% {'time_t' : _time_t_type }
 
-""" % {'time_t' : time_t_type }
-
-functions = """
-
+win32_functions = \
+'''
 DWORD GetAdaptersInfo( PIP_ADAPTER_INFO pAdapterInfo, PULONG pOutBufLen );
+'''
 
-"""
+def _make_includes(includes):
+    return '\n'.join(['#include <%s>' % include for include in includes])
+
+win32_cdef = '\n'.join([win32_defines, win32_structs, win32_functions])
 
 ffi = FFI()
-ffi.cdef(win32_errors + structs + functions)
+C = ffi.cdef(win32_cdef)
 
-verify = """
+win32_include_files = [
+    'winsock2.h',
+    'Iphlpapi.h'
+]
 
-#include <winsock2.h>
-#include <Iphlpapi.h>
+win32_includes = _make_includes(win32_include_files)
 
-"""
+win32_libs = [
+    'IPHLPAPI'
+]
 
-C = ffi.verify(verify, libraries=['IPHLPAPI'])
+C = ffi.verify(win32_includes, libraries=win32_libs)
